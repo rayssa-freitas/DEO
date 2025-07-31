@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Fluxo por Tipologia</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="p-4">
+  <h1>Fluxo de Movimentação</h1>
+
+  <form id="filtro" class="row g-3 mb-4">
+    <div class="col-md-5">
+      <label class="form-label">Tipologia</label>
+      <input type="text" id="tipologia" class="form-control" placeholder="ex: restaurante">
+    </div>
+    <div class="col-md-5">
+      <label class="form-label">Cidade/Estado</label>
+      <input type="text" id="city_state" class="form-control" placeholder="ex: São Paulo, SP">
+    </div>
+    <div class="col-md-2 d-flex align-items-end">
+      <button type="button" id="btnSearch" class="btn btn-primary w-100">Pesquisar</button>
+    </div>
+  </form>
+
+  <canvas id="chartFluxo"></canvas>
+  <button id="btnDownload" class="btn btn-secondary mt-3">Baixar TXT</button>
+
+  <script>
+    const ctx = document.getElementById('chartFluxo');
+    let chart;
+
+    document.getElementById('btnSearch').onclick = async () => {
+      const tipo = encodeURIComponent(document.getElementById('tipologia').value);
+      const cs   = encodeURIComponent(document.getElementById('city_state').value);
+      const res  = await fetch(`/search?tipologia=${tipo}&city_state=${cs}`);
+      const data = await res.json();
+
+      // Prepara labels e datasets
+      const labels = Array.from({length:24}, (_,i)=>`${i}:00`);
+      const datasets = Object.entries(data).map(([grupo, arr], i) => ({
+        label: grupo,
+        data: arr.map(o=>o.valor),
+        fill: false,
+        borderWidth: 2
+      }));
+
+      // Renderiza Chart.js
+      if (chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: { responsive: true }
+      });
+
+      // Habilita download
+      document.getElementById('btnDownload').onclick = () => {
+        let txt = 'hora\t' + Object.keys(data).join('\t') + '\n';
+        for (let h=0; h<24; h++) {
+          txt += `${h}:00\t` + Object.values(data).map(arr=>arr[h].valor).join('\t') + '\n';
+        }
+        const blob = new Blob([txt], {type:'text/plain'});
+        const url  = URL.createObjectURL(blob);
+        const a    = document.createElement('a');
+        a.href     = url;
+        a.download = `fluxo_${tipo}.txt`;
+        a.click();
+        URL.revokeObjectURL(url);
+      };
+    };
+  </script>
+</body>
+</html>
