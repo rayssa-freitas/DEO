@@ -21,8 +21,9 @@ Este projeto fornece uma aplicação web para consultar, visualizar e baixar inf
 ## Instalação:
 1. **Acesso ao Repositório**
 ```sh
-    git clone <link>
-    cd <pasta>
+    - git clone ``` https://github.com/rayssa-freitas/DEO.git ```
+    
+    - cd ``` C:\Users\rayss\Downloads\DEO ```
 ```
 
 2. **Criação do Ambiente Virtual**

@@ -1,74 +1,137 @@
 <!DOCTYPE html>
-<html lang="pt-br">
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Fluxo por Tipologia</title>
+  <title>Movimentação de Pessoas - Horários de Pico</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f9fafd; }
+    .card { border-radius: 1rem; margin-top: 2rem; }
+    #grafico { background: white; padding: 1rem; border-radius: 1rem;}
+  </style>
 </head>
-<body class="p-4">
-  <h1>Fluxo de Movimentação</h1>
-
-  <form id="filtro" class="row g-3 mb-4">
-    <div class="col-md-5">
-      <label class="form-label">Tipologia</label>
-      <input type="text" id="tipologia" class="form-control" placeholder="ex: restaurante">
+<body>
+  <div class="container">
+    <div class="card p-4">
+      <h2 class="mb-3">Horários de Pico por Tipologia</h2>
+      <form id="form-busca" class="row g-3">
+        <div class="col-md-4">
+          <label for="tipologia" class="form-label">Tipologia</label>
+          <select class="form-select" id="tipologia" required>
+            <option value="">Selecione...</option>
+            <option value="shopping">Shopping</option>
+            <option value="restaurante">Restaurante</option>
+            <option value="hotel">Hotel</option>
+            <option value="supermercado">Supermercado</option>
+            <option value="farmacia">Farmácia</option>
+            <!-- Adapte para o que tem no seu CSV! -->
+          </select>
+        </div>
+        <div class="col-md-4">
+          <label for="city_state" class="form-label">Cidade/Estado</label>
+          <input type="text" class="form-control" id="city_state" placeholder="Ex: Belém/PA" required>
+        </div>
+        <div class="col-md-4 d-flex align-items-end">
+          <button type="submit" class="btn btn-primary w-100">Pesquisar</button>
+        </div>
+      </form>
     </div>
-    <div class="col-md-5">
-      <label class="form-label">Cidade/Estado</label>
-      <input type="text" id="city_state" class="form-control" placeholder="ex: São Paulo, SP">
+
+    <div class="card p-4 mt-4" id="resultado-section" style="display:none;">
+      <h4 class="mb-3">Fluxo de Movimentação (0–1)</h4>
+      <canvas id="grafico" height="80"></canvas>
+      <a id="btnDownload" class="btn btn-success mt-3" style="display:none;">Baixar TXT</a>
     </div>
-    <div class="col-md-2 d-flex align-items-end">
-      <button type="button" id="btnSearch" class="btn btn-primary w-100">Pesquisar</button>
-    </div>
-  </form>
+  </div>
 
-  <canvas id="chartFluxo"></canvas>
-  <button id="btnDownload" class="btn btn-secondary mt-3">Baixar TXT</button>
+<script>
+let chartRef = null;
 
-  <script>
-    const ctx = document.getElementById('chartFluxo');
-    let chart;
+document.getElementById('form-busca').onsubmit = async function(e) {
+  e.preventDefault();
+  const tipologia = document.getElementById('tipologia').value;
+  const city_state = document.getElementById('city_state').value;
 
-    document.getElementById('btnSearch').onclick = async () => {
-      const tipo = encodeURIComponent(document.getElementById('tipologia').value);
-      const cs   = encodeURIComponent(document.getElementById('city_state').value);
-      const res  = await fetch(`/search?tipologia=${tipo}&city_state=${cs}`);
-      const data = await res.json();
+  const resp = await fetch(`/search?tipologia=${encodeURIComponent(tipologia)}&city_state=${encodeURIComponent(city_state)}`);
+  if (!resp.ok) {
+    alert('Erro ao buscar dados');
+    return;
+  }
+  const data = await resp.json();
 
-      // Prepara labels e datasets
-      const labels = Array.from({length:24}, (_,i)=>`${i}:00`);
-      const datasets = Object.entries(data).map(([grupo, arr], i) => ({
-        label: grupo,
-        data: arr.map(o=>o.valor),
-        fill: false,
-        borderWidth: 2
-      }));
+  // Processa os dados do backend
+  const horas = Array.from({length: 24}, (_, i) => i);
 
-      // Renderiza Chart.js
-      if (chart) chart.destroy();
-      chart = new Chart(ctx, {
-        type: 'line',
-        data: { labels, datasets },
-        options: { responsive: true }
-      });
+  function arrToSeries(arr) {
+    let vals = Array(24).fill(null);
+    (arr || []).forEach(e => { vals[e.hora] = e.valor; });
+    return vals;
+  }
 
-      // Habilita download
-      document.getElementById('btnDownload').onclick = () => {
-        let txt = 'hora\t' + Object.keys(data).join('\t') + '\n';
-        for (let h=0; h<24; h++) {
-          txt += `${h}:00\t` + Object.values(data).map(arr=>arr[h].valor).join('\t') + '\n';
-        }
-        const blob = new Blob([txt], {type:'text/plain'});
-        const url  = URL.createObjectURL(blob);
-        const a    = document.createElement('a');
-        a.href     = url;
-        a.download = `fluxo_${tipo}.txt`;
-        a.click();
-        URL.revokeObjectURL(url);
-      };
-    };
-  </script>
+  const datasets = [
+    {
+      label: "Dia Típico (Seg–Sex)",
+      data: arrToSeries(data.dia_tipico),
+      borderColor: "#0a6fd8",
+      fill: false
+    },
+    {
+      label: "Sábado",
+      data: arrToSeries(data.sabado),
+      borderColor: "#21c96b",
+      fill: false
+    },
+    {
+      label: "Domingo",
+      data: arrToSeries(data.domingo),
+      borderColor: "#e23c4e",
+      fill: false
+    }
+  ];
+
+  // Gera o gráfico (Chart.js)
+  const ctx = document.getElementById('grafico').getContext('2d');
+  if (chartRef) { chartRef.destroy(); }
+  chartRef = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels: horas.map(h => h.toString().padStart(2,'0') + ":00"),
+      datasets: datasets
+    },
+    options: {
+      responsive: true,
+      interaction: {mode: 'index', intersect: false},
+      plugins: {
+        title: {display: false},
+        tooltip: {enabled: true},
+        legend: {position: 'top'}
+      },
+      scales: {
+        y: {min: 0, max: 1, title: {display:true, text: "Fluxo (0–1)"}},
+        x: {title: {display:true, text: "Hora do Dia"}}
+      }
+    }
+  });
+
+  document.getElementById('resultado-section').style.display = '';
+  // Baixar TXT
+  let txt = '';
+  for (const [key, arr] of Object.entries(data)) {
+    txt += `=== ${key.toUpperCase()} ===\n`;
+    (arr || []).forEach(e => {
+      txt += `${e.hora.toString().padStart(2,'0')}:00\t${e.valor}\n`;
+    });
+    txt += '\n';
+  }
+  const blob = new Blob([txt], {type: "text/plain"});
+  const url = URL.createObjectURL(blob);
+  const btn = document.getElementById('btnDownload');
+  btn.href = url;
+  btn.download = `fluxo_${tipologia}_${city_state.replace('/','-')}.txt`;
+  btn.style.display = 'inline-block';
+}
+</script>
 </body>
 </html>
