@@ -30,6 +30,8 @@ def compute_idf(df, tipologia: str, city_state: str = None):
 
     for _, row in sub.iterrows():
         for day, interval in row[['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday']].items():
+            if not isinstance(interval, str) or ' - ' not in interval:
+                continue
             inicio, fim = interval.split(' - ')
             h0 = int(inicio.split(':')[0])
             h1 = int(fim.split(':')[0])

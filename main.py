@@ -9,32 +9,46 @@ app = Flask(__name__)
 CSV_FILE = 'resultado_processado (2).csv'
 DF = pd.read_csv(CSV_FILE, sep=',')
 
-def get_fluxo_json(tipologia, city_state):
-    df_filtrado = DF[(DF['tipologia'].str.lower() == tipologia.lower()) & 
-                     (DF['city_state'].str.lower() == city_state.lower())]
-    if df_filtrado.empty:
-        return {'erro': 'Não encontrado'}
+# Tipologias fixas com label e value
+TIPOLOGIAS_FIXAS = [
+    {"label": "Escola Pública", "value": "school"},
+    {"label": "Hospital", "value": "hospital"},
+    {"label": "Cinema", "value": "movie_theater"},
+    {"label": "Teatro", "value": "theater"},
+    {"label": "Aeroporto", "value": "airport"},
+    {"label": "Rodoviária", "value": "bus_station"},
+    {"label": "Centro de Convenções", "value": "convention_center"},
+    {"label": "Museu", "value": "museum"},
+    {"label": "Hotel", "value": "hotel"},
+    {"label": "Pousada", "value": "guesthouse"},
+    {"label": "Shopping Center", "value": "shopping_center"},
+    {"label": "Comércio", "value": "business"},
+    {"label": "Varejo", "value": "retail"},
+    {"label": "Loja", "value": "shop"},
+    {"label": "Restaurante", "value": "restaurant"},
+    {"label": "Universidade", "value": "university"},
+    {"label": "Posto de Saúde", "value": "health_center"},
+    {"label": "Processamento de Dados", "value": "data_center"},
+]
 
-    # Mapear dias
-    map_dias = {
-        'segunda': 'dia_tipico', 'terça': 'dia_tipico', 'quarta': 'dia_tipico',
-        'quinta': 'dia_tipico', 'sexta': 'dia_tipico',
-        'sábado': 'sabado', 'domingo': 'domingo'
-    }
-    resultado = {'dia_tipico': [], 'sabado': [], 'domingo': []}
-    for _, row in df_filtrado.iterrows():
-        key = map_dias.get(row['dia'].strip().lower())
-        if key:
-            resultado[key].append({'hora': int(row['hora']), 'valor': float(row['fluxo'])})
-
-    # Ordena por hora
-    for key in resultado:
-        resultado[key] = sorted(resultado[key], key=lambda x: x['hora'])
-    return resultado
+CIDADES_FIXAS = [
+    "São Paulo/SP", "Rio de Janeiro/RJ", "Belo Horizonte/MG", "Curitiba/PR",
+    "Porto Alegre/RS", "Salvador/BA", "Brasília/DF", "Fortaleza/CE",
+    "Recife/PE", "Manaus/AM", "Belém/PA", "Florianópolis/SC", "Goiânia/GO",
+    "Vitória/ES", "Natal/RN", "Campo Grande/MS", "João Pessoa/PB",
+    "Teresina/PI", "Palmas/TO", "Porto Velho/RO", "Macapá/AP", "Rio Branco/AC"
+]
 
 @app.route('/')
 def index():
     return render_template('index.html')
+
+@app.route('/options')
+def options():
+    return jsonify({
+        "tipologias": TIPOLOGIAS_FIXAS,
+        "cidades": CIDADES_FIXAS
+    })
 
 @app.route('/search')
 def search():
@@ -42,18 +56,19 @@ def search():
     city_state = request.args.get('city_state')
     if not tipologia or not city_state:
         return jsonify({'erro': 'Parâmetros obrigatórios'}), 400
-    data = compute_idf(DF, tipologia, city_state)
-    if 'erro' in data:
-        return jsonify(data), 404
-    return jsonify(data)
+    try:
+        data = compute_idf(DF, tipologia, city_state)
+        if not data or all(len(d) == 0 for d in data.values()):
+            return jsonify({'erro': 'Dados não encontrados'}), 404
+        return jsonify(data)
+    except Exception as e:
+        return jsonify({'erro': str(e)}), 500
 
 @app.route('/download')
 def download():
     tipologia = request.args.get('tipologia')
     city_state = request.args.get('city_state')
-    data = get_fluxo_json(tipologia, city_state)
-    if 'erro' in data:
-        return "Dados não encontrados", 404
+    data = compute_idf(DF, tipologia, city_state)
     txt = ""
     for key, valores in data.items():
         txt += f"=== {key.upper()} ===\n"

@@ -31,7 +31,9 @@
         </div>
         <div class="col-md-4">
           <label for="city_state" class="form-label">Cidade/Estado</label>
-          <input type="text" class="form-control" id="city_state" placeholder="Ex: Belém/PA" required>
+          <select class="form-select" id="city_state" required>
+            <option value="">Selecione...</option>
+          </select>        
         </div>
         <div class="col-md-4 d-flex align-items-end">
           <button type="submit" class="btn btn-primary w-100">Pesquisar</button>
@@ -47,7 +49,30 @@
   </div>
 
 <script>
+
 let chartRef = null;
+
+window.onload = async function carregarOptions() {
+  const resp = await fetch('/options');
+  const data = await resp.json();
+
+  const tipologiaSelect = document.getElementById('tipologia');
+  const cidadeSelect = document.getElementById('city_state');
+
+  data.tipologias.forEach(t => {
+    const option = document.createElement('option');
+    option.value = t.value;
+    option.text = t.label;
+    tipologiaSelect.appendChild(option);
+  });
+
+  data.cidades.forEach(c => {
+    const option = document.createElement('option');
+    option.value = c;
+    option.text = c;
+    cidadeSelect.appendChild(option);
+  });
+};
 
 document.getElementById('form-busca').onsubmit = async function(e) {
   e.preventDefault();
@@ -114,6 +139,42 @@ document.getElementById('form-busca').onsubmit = async function(e) {
       }
     }
   });
+  
+  fetch('/options')
+  .then(res => res.json())
+  .then(data => {
+    const tipologiaSelect = document.getElementById('tipologia');
+    const cidadeSelect = document.getElementById('cidade');
+
+    data.tipologias.forEach(t => {
+      const option = document.createElement('option');
+      option.value = t;
+      option.textContent = t;
+      tipologiaSelect.appendChild(option);
+    });
+
+    data.cidades.forEach(c => {
+      const option = document.createElement('option');
+      option.value = c;
+      option.textContent = c;
+      cidadeSelect.appendChild(option);
+    });
+  });
+
+  async function carregarOptions() {
+    const resp = await fetch('/options');
+    const data = await resp.json();
+    // Preencher o select de tipologia e cidade/estado
+    const tipologiaSelect = document.getElementById('tipologia');
+    data.tipologias.forEach(t => {
+      tipologia.innerHTML += `<option value="${t}">${t}</option>`;
+    });
+    const cidadeSelect = document.getElementById('cidadeSelect');
+    data.cidades.forEach(c => {
+      cidadeSelect.innerHTML += `<option value="${c}">${c}</option>`;
+    });
+  }
+  window.onload = carregarOptions;
 
   document.getElementById('resultado-section').style.display = '';
   // Baixar TXT
@@ -131,7 +192,7 @@ document.getElementById('form-busca').onsubmit = async function(e) {
   btn.href = url;
   btn.download = `fluxo_${tipologia}_${city_state.replace('/','-')}.txt`;
   btn.style.display = 'inline-block';
-}
+};
 </script>
 </body>
 </html>
